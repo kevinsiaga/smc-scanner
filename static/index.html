@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0f14">
+<title>SMC Scanner</title>
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --surface:  #161a24;
+    --border:   #232736;
+    --bull:     #26d07c;
+    --bear:     #f04e5e;
+    --gold:     #f5c842;
+    --blue:     #4e8ef5;
+    --text:     #e8eaf2;
+    --muted:    #6b7190;
+    --radius:   14px;
+    --font:     -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); }
+
+  /* ── Header ── */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px 10px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { font-size: 17px; font-weight: 600; letter-spacing: .3px; }
+  .logo span { color: var(--bull); }
+  .updated { font-size: 11px; color: var(--muted); }
+  .refresh-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .refresh-btn:active { opacity: .7; }
+
+  /* ── Stats bar ── */
+  .stats {
+    display: flex; gap: 8px; padding: 10px 16px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .stats::-webkit-scrollbar { display: none; }
+  .stat-pill {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 12px;
+    font-size: 12px; white-space: nowrap; flex-shrink: 0;
+  }
+  .stat-pill b { color: var(--gold); }
+
+  /* ── Filter tabs ── */
+  .filters {
+    display: flex; gap: 6px; padding: 0 16px 10px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-btn {
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 20px;
+    padding: 5px 14px; font-size: 12px; cursor: pointer;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .filter-btn.active {
+    background: var(--blue); border-color: var(--blue);
+    color: #fff; font-weight: 500;
+  }
+
+  /* ── Signal cards ── */
+  .cards { padding: 0 16px 100px; display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-top {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px 8px;
+  }
+  .symbol { font-size: 16px; font-weight: 600; }
+  .tf-badge {
+    font-size: 11px; font-weight: 500;
+    background: rgba(78,142,245,.15); color: var(--blue);
+    padding: 2px 8px; border-radius: 6px;
+  }
+  .dir-badge {
+    font-size: 12px; font-weight: 600;
+    padding: 3px 10px; border-radius: 8px;
+  }
+  .bull-badge { background: rgba(38,208,124,.12); color: var(--bull); }
+  .bear-badge { background: rgba(240,78,94,.12);  color: var(--bear); }
+
+  .sig-type {
+    font-size: 11px; color: var(--muted);
+    padding: 0 14px 10px;
+  }
+  .sig-type b { color: var(--gold); }
+
+  .divider { height: 1px; background: var(--border); margin: 0 14px; }
+
+  .levels {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1px; background: var(--border);
+    border-top: 1px solid var(--border);
+  }
+  .level {
+    background: var(--surface);
+    padding: 10px 14px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .level-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .level-val   { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .entry-val { color: var(--text); }
+  .sl-val    { color: var(--bear); }
+  .tp1-val   { color: var(--bull); }
+  .tp2-val   { color: #7ec8f5; }
+
+  .card-footer {
+    padding: 8px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--border);
+  }
+  .rr { font-size: 13px; font-weight: 600; color: var(--gold); }
+  .time { font-size: 11px; color: var(--muted); }
+
+  /* ── Empty / loading ── */
+  .empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--muted); font-size: 14px;
+  }
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Countdown bar ── */
+  .countdown-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--bg); border-top: 1px solid var(--border);
+    padding: 10px 16px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .cd-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cd-progress {
+    flex: 1; height: 3px;
+    background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .cd-fill {
+    height: 100%; background: var(--blue);
+    border-radius: 2px;
+    transition: width .5s linear;
+  }
+  .cd-time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* ── No signal state ── */
+  .no-sig {
+    padding: 40px 16px; text-align: center;
+    color: var(--muted); font-size: 14px; line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SMC <span>Scanner</span></div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="updated" id="updatedTime">–</div>
+    <button class="refresh-btn" onclick="loadSignals()">↻ Scan</button>
+  </div>
+</header>
+
+<div class="stats" id="statsBar">
+  <div class="stat-pill">Scanning <b id="scannedCount">–</b> combos</div>
+  <div class="stat-pill">Signals: <b id="sigCount">–</b></div>
+  <div class="stat-pill">Bullish: <b id="bullCount" style="color:var(--bull)">–</b></div>
+  <div class="stat-pill">Bearish: <b id="bearCount" style="color:var(--bear)">–</b></div>
+</div>
+
+<div class="filters" id="filterBar">
+  <button class="filter-btn active" onclick="setFilter('All')">All</button>
+  <button class="filter-btn" onclick="setFilter('CHoCH')">CHoCH</button>
+  <button class="filter-btn" onclick="setFilter('BOS')">BOS</button>
+  <button class="filter-btn" onclick="setFilter('Liq Sweep')">Liq Sweep</button>
+  <button class="filter-btn" onclick="setFilter('FVG')">FVG</button>
+  <button class="filter-btn" onclick="setFilter('Bullish')">📈 Bullish</button>
+  <button class="filter-btn" onclick="setFilter('Bearish')">📉 Bearish</button>
+</div>
+
+<div class="cards" id="cardsContainer">
+  <div class="empty"><div class="spinner"></div>Loading signals…</div>
+</div>
+
+<div class="countdown-bar">
+  <span class="cd-label">Next scan</span>
+  <div class="cd-progress"><div class="cd-fill" id="cdFill" style="width:100%"></div></div>
+  <span class="cd-time" id="cdTime">60s</span>
+</div>
+
+<script>
+const REFRESH_SEC = 60;
+let allSignals   = [];
+let activeFilter = "All";
+let cdInterval, cdRemaining;
+
+// ── Fetch signals ─────────────────────────────────────────────────
+async function loadSignals() {
+  document.getElementById("cardsContainer").innerHTML =
+    '<div class="empty"><div class="spinner"></div>Scanning market…</div>';
+  resetCountdown();
+  try {
+    const res  = await fetch("/api/signals");
+    const data = await res.json();
+    allSignals = data.signals || [];
+
+    document.getElementById("updatedTime").textContent  = "Updated " + data.updated;
+    document.getElementById("scannedCount").textContent = data.scanned;
+    document.getElementById("sigCount").textContent     = data.count;
+    document.getElementById("bullCount").textContent    =
+      allSignals.filter(s => s.direction === "Bullish").length;
+    document.getElementById("bearCount").textContent    =
+      allSignals.filter(s => s.direction === "Bearish").length;
+
+    renderCards();
+  } catch(e) {
+    document.getElementById("cardsContainer").innerHTML =
+      '<div class="empty">⚠️ Could not reach scanner.<br>Check your server is running.</div>';
+  }
+}
+
+// ── Render cards ──────────────────────────────────────────────────
+function renderCards() {
+  const container = document.getElementById("cardsContainer");
+  let filtered = allSignals;
+
+  if(activeFilter !== "All") {
+    filtered = allSignals.filter(s =>
+      s.type === activeFilter ||
+      s.direction === activeFilter
+    );
+  }
+
+  if(filtered.length === 0) {
+    container.innerHTML =
+      '<div class="no-sig">No ' + (activeFilter !== "All" ? activeFilter + " " : "") +
+      'signals right now.<br>Market is consolidating or conditions not met.<br>' +
+      '<span style="font-size:12px;color:var(--muted)">Auto-refreshes every 60 seconds.</span></div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(s => {
+    const isBull  = s.direction === "Bullish";
+    const arrow   = isBull ? "📈" : "📉";
+    const dirCls  = isBull ? "bull-badge" : "bear-badge";
+
+    return `
+      <div class="card">
+        <div class="card-top">
+          <span class="symbol">${arrow} ${s.symbol}</span>
+          <span class="tf-badge">${s.timeframe}</span>
+          <span class="dir-badge ${dirCls}">${s.direction}</span>
+        </div>
+        <div class="sig-type">Signal: <b>${s.type}</b></div>
+        <div class="levels">
+          <div class="level">
+            <span class="level-label">Entry</span>
+            <span class="level-val entry-val">${s.entry}</span>
+          </div>
+          <div class="level">
+            <span class="level-label">Stop Loss</span>
+            <span class="level-val sl-val">${s.sl}</span>
+          </div>
+          <div class="level">
+            <span class="level-label">TP1 (1:1)</span>
+            <span class="level-val tp1-val">${s.tp1}</span>
+          </div>
+          <div class="level">
+            <span class="level-label">TP2 (Liquidity)</span>
+            <span class="level-val tp2-val">${s.tp2}</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="rr">⚖️ R:R  1:${s.rr}</span>
+          <span class="time">${s.time}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ── Filter ────────────────────────────────────────────────────────
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll(".filter-btn").forEach(b => {
+    b.classList.toggle("active", b.textContent.includes(f) ||
+                                  (f === "All" && b.textContent === "All"));
+  });
+  renderCards();
+}
+
+// ── Countdown ─────────────────────────────────────────────────────
+function resetCountdown() {
+  clearInterval(cdInterval);
+  cdRemaining = REFRESH_SEC;
+  cdInterval = setInterval(() => {
+    cdRemaining--;
+    const pct = (cdRemaining / REFRESH_SEC) * 100;
+    document.getElementById("cdFill").style.width  = pct + "%";
+    document.getElementById("cdTime").textContent  = cdRemaining + "s";
+    if(cdRemaining <= 0) loadSignals();
+  }, 1000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+loadSignals();
+</script>
+</body>
+</html>
